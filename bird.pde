@@ -7,7 +7,7 @@ class Bird
   
   ArrayList<Bird> neighbors = new ArrayList<Bird>();
 
-  Bird(PVector position)
+  public Bird(PVector position)
   {
     this.position = position;
     this.velocity = new PVector(0, 0);
@@ -30,13 +30,19 @@ class Bird
     center.div(neighbors.size());
 
     PVector delta = PVector.sub(center, position);
+    delta.limit(maxForceCohesion);
 
-    // stroke(128, 0, 0);
-    // line(position.x, position.y, position.x + delta.x, position.y + delta.y);
-    // fill(0, 128, 0);
-    // circle(center.x, center.y, 5);
+    stroke(100, 100, 128, 120);
+    strokeWeight(3);
+    //delta.div(distance * distance);
 
-    delta.setMag(0.58);
+    if (drawVectors)
+    {
+      line(position.x, position.y, position.x + delta.x * 50, position.y + delta.y * 50);      
+    }
+    
+
+
     acceleration.add(delta);
     
   }
@@ -52,26 +58,20 @@ class Bird
 
     for (Bird neighbor: neighbors)
     {
-      float distance = PVector.dist(position, neighbor.position);
+      float distance = PVector.dist(neighbor.position, position);
+      PVector delta = PVector.sub(position, neighbor.position).mult(5);
 
-      PVector delta = PVector.sub(position, neighbor.position);
-      sum.add(delta.div(distance * distance));
+      stroke(100, 128, 100, 120);
+      strokeWeight(3);
+      //delta.div(distance * distance);
+      delta.limit(maxForceSeparation);
+      if (drawVectors)
+      {
+        //line(position.x, position.y, position.x + delta.x * 50, position.y + delta.y * 50);
+      }
+
+      acceleration.add(delta);
     }
-
-    sum.div(neighbors.size());
-    sum.normalize();
-    sum.setMag(0.6);
-    //sum.sub(velocity);
-
-    //sum.limit(2);
-    acceleration.add(sum);
-    
-
-    // fill(0, 255, 0);
-    // stroke(0, 128, 0, 40);
-    // line(position.x, position.y, position.x + delta.x, position.y + delta.y);
-    //velocity.add(delta.mult(-0.00000001f));
-
   }
 
   void ApplyAlignment()
@@ -88,14 +88,74 @@ class Bird
     }
 
     heading.div(neighbors.size());
-    heading.limit(0.5);
+    heading.limit(maxForceAlignment);
+
+    if (drawVectors)
+    {
+      line(position.x, position.y, position.x + heading.x * 15, position.y + heading.y  * 15);      
+    }
+
     acceleration.add(heading);
-
-
-  
-    //velocity.add(delta.mult(-0.00000001f));
   }
 
+  void AvoidObstacles()
+  {
+      for (Obstacle obstacle : obstacles)
+      {
+        float distance = PVector.dist(obstacle.position, position);
+
+        if (distance < 100 + obstacle.radius)
+        {
+          PVector delta = PVector.sub(position, obstacle.position);
+          delta.div(distance * distance).mult(maxForceObstacleAvoidance);
+
+          if (drawVectors)
+          {        
+            stroke(128, 100, 100);
+            strokeWeight(3);
+            line(position.x, position.y, position.x + delta.x * 100, position.y + delta.y * 100);
+          }
+
+          acceleration.add(delta);
+        }
+      }
+  }
+
+  public void AvoidWalls()
+  {
+    int edge = 100;
+    float distance;
+    // let's wrap the coordinates around the screen's edge, to make the birds not drift away too far
+
+    if (this.position.x < edge)
+    { 
+      distance = this.position.x + 1;
+
+      this.acceleration.add(new PVector(200 / (distance * distance), 0));
+      //this.position.x = width;
+    }
+
+    if (this.position.x > width - edge)
+    {
+      distance = width - this.position.x + 1;
+
+      this.acceleration.add(new PVector(-100 / (distance * distance), 0));
+      //this.position.x = 0;
+    }
+
+    if (this.position.y < edge)
+    {
+      distance = this.position.y + 1;
+      this.acceleration.add(new PVector(0, 100 / (distance * distance)));
+      //this.position.y = height;
+    }
+
+    if (this.position.y > height - edge)
+    {
+      distance = height - this.position.y + 1;
+      this.acceleration.add(new PVector(0, -100 / (distance * distance)));
+    }
+  }
 
   void update()
   {
@@ -105,56 +165,26 @@ class Bird
     ApplySeparation();
     ApplyCohesion();
     ApplyAlignment();
+    // AvoidObstacles();
+    AvoidWalls();
 
     this.velocity.add(this.acceleration);
-    this.velocity.limit(1);
-
-    
+    this.velocity.limit(speedLimit);
     this.position.add(this.velocity);
-
-    if (this.position.x < 0)
-    {
-      this.position.x = 800;
-    }
-
-    if (this.position.x > 800)
-    {
-      this.position.x = 0;
-    }
-
-    if (this.position.y < 0)
-    {
-      this.position.y = 800;
-    }
-
-    if (this.position.y > 800)
-    {
-      this.position.y = 0;
-    }
   }
   
   void render()
   {
-    stroke(0, 128);
-    for (Bird neighbor : neighbors)
+    stroke(128);
+    if (drawBearing)
     {
-      float distance = PVector.dist(position, neighbor.position);
-      if (distance > 20)
-      {
-        continue;
-      }
-
-      //line(position.x, position.y, neighbor.position.x, neighbor.position.y);
+      PVector bearing = velocity.copy().normalize().mult(15);
+      line(position.x, position.y, position.x + bearing.x, position.y + bearing.y);
     }
 
     stroke(128);
     fill(255, 255);
-    circle(position.x, position.y, 5);
-    noStroke();
-    fill(0, 10);
-
-    circle(position.x, position.y, distanceThreshold);
-
-    
+    circle(position.x, position.y, 10);
   }
 }
+
